@@ -246,7 +246,7 @@ class AudioProcessor:
         overall_la_eq = self.compute_LAeq(smoothed)
 
         # Step 3: Calculate per-second LAeqs
-        print("     Calculating LAeq")
+        print("     Calculating sound level")
         samples_per_second = sample_rate
         per_second_la_eqs = []
 

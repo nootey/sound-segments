@@ -4,12 +4,15 @@ from datetime import datetime, timedelta
 import numpy as np
 from pydub import AudioSegment
 from scipy.signal import sosfilt
+
+from src.internal.audio_percentiles import AudioPercentiles
 from src.internal.audio_processor import AudioProcessor
 
 def main():
     print("Sound segments")
 
     ap = AudioProcessor()
+    perc = AudioPercentiles()
 
     recording_name = "sample"
     audio_file_path = f"data/{recording_name}"
@@ -31,9 +34,16 @@ def main():
     base_timestamp = datetime.now().replace(second=0, microsecond=0)
 
     for i, segment in enumerate(segments):
-        print(f"Processing segment: {i+1}")
+        print(f"\nProcessing segment: {i+1}")
         segment_time = base_timestamp + timedelta(seconds=i * 60)
+
+        print(f"Calculating LAeq")
         segment_data = ap.process_segment(segment, sample_rate, sos, segment_time, i)
+
+        print(f"Calculating percentiles")
+        with_percentile_data = perc.calculate_percentiles(segment_data)
+
+        segment_data.update(with_percentile_data)
         output_data.append(segment_data)
 
     json_result = {"data": output_data}
@@ -42,7 +52,7 @@ def main():
     with open(output_path, "w") as f:
         json.dump(json_result, f, indent=2)
 
-    print(f"\nLAeq JSON written to: {output_path}")
+    print(f"\nMetadata saved to: {output_path}")
 
 
 if __name__ == "__main__":
