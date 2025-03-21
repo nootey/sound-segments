@@ -35,6 +35,12 @@ def main():
         smoothed = ap.apply_exponential_moving_average(squared, sample_rate)
         print(f"First 10 smoothed samples (segment {i + 1}): {smoothed[:10]}")
 
+        # Apply RMS
+        rms_pressure = ap.apply_root_mean_square(smoothed)
+        print(f"First 10 root mean square pressure (segment {i + 1}){rms_pressure[:10]}")
+
+        spl = ap.pressure_to_db(rms_pressure)
+        print(f"First 10 SPLs (segment {i + 1}){spl[:10]} \n")
 
 if __name__ == "__main__":
     main()

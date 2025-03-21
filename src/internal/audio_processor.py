@@ -168,3 +168,34 @@ class AudioProcessor:
             return smoothed
         except Exception as e:
             raise e
+
+    def apply_root_mean_square(self, smoothed_signal):
+        """
+        To get back to something proportional to sound pressure, take the square root of that smoothed power.
+        """
+        try:
+            return np.sqrt(smoothed_signal)
+        except Exception as e:
+            raise e
+
+    def pressure_to_db(self, rms_pressure, ref_pressure=20e-6):
+        """
+        Convert RMS sound pressure to decibels (SPL).
+
+        Parameters:
+            rms_pressure (np.ndarray): RMS A-weighted pressure signal.
+            ref_pressure (float): Reference pressure in Pascals. Default is 20 µPa for air.
+
+        Returns:
+            np.ndarray: Sound Pressure Level (SPL) in dB.
+        """
+        try:
+            # Avoid log(0) by setting a very small floor
+            rms_pressure = np.maximum(rms_pressure, 1e-12)
+
+            # Apply the SPL formula
+            spl = 20 * np.log10(rms_pressure / ref_pressure)
+
+            return spl
+        except Exception as e:
+            raise e
