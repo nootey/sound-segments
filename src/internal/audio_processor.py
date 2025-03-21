@@ -28,12 +28,11 @@ class AudioProcessor:
         """
         Checks if the file has an extension. If not, looks for the file with an extension in the filesystem.
         """
-        # Check if the file already has an extension
-        if '.' in file_path:
+        if '.' in file_path and os.path.isfile(file_path):
             return file_path
 
-        # If no extension is provided, attempt to find the file with an extension
-        for ext in ['.mp3', '.wav']:
+        # Try known extensions
+        for ext in ['.wav', '.mp3']:  # Prioritize .wav first
             possible_path = file_path + ext
             if os.path.isfile(possible_path):
                 return possible_path
@@ -43,30 +42,32 @@ class AudioProcessor:
     def ensure_wav_format(self, file_path: str) -> str:
         """
         Ensures the audio file is in .wav format.
+        If input is MP3 and a corresponding WAV exists, it uses the WAV.
+        If not, converts the MP3 to WAV.
         """
-        # Check if the file exists and find the file with the extension
         file_with_ext = self.get_file_with_extension(file_path)
-
-        # Get the extension and handle logic
-        _, ext = os.path.splitext(file_with_ext)
+        base_name, ext = os.path.splitext(file_with_ext)
         ext = ext.lower()
-
-        print(ext)
-
-        if ext not in ['.mp3', '.wav']:
-            raise ValueError(f"Unsupported file format: {ext}. Only MP3 and WAV are supported.")
 
         if ext == '.wav':
             return file_with_ext
 
-        # If it's an MP3, convert to WAV
-        audio = AudioSegment.from_mp3(file_with_ext)
-        wav_path = file_with_ext.replace('.mp3', '.wav')
+        elif ext == '.mp3':
+            wav_path = base_name + '.wav'
 
-        print(f"Converting MP3 to WAV: {wav_path}")
-        audio.export(wav_path, format="wav")
+            # If WAV version already exists, use it
+            if os.path.isfile(wav_path):
+                print(f"WAV version already exists: {wav_path}")
+                return wav_path
 
-        return wav_path
+            # Otherwise, convert MP3 to WAV
+            print(f"Converting MP3 to WAV: {wav_path}")
+            audio = AudioSegment.from_mp3(file_with_ext)
+            audio.export(wav_path, format="wav")
+            return wav_path
+
+        else:
+            raise ValueError(f"Unsupported file format: {ext}. Only MP3 and WAV are supported.")
 
     def ensure_recording_length(self, recording: AudioSegment):
         duration_seconds = len(recording) / 1000  # Convert from ms to seconds
