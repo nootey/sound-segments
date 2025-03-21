@@ -1,5 +1,5 @@
 from pydub import AudioSegment
-
+from scipy.signal import sosfilt
 from src.internal.audio_processor import AudioProcessor
 
 def main():
@@ -11,14 +11,18 @@ def main():
     audio_file_path = f"data/{recording_name}.mp3"
 
     # Load the audio file
-    try:
-        recording = AudioSegment.from_file(audio_file_path)
-        segments = ap.ensure_recording_length(recording)
+    samples, sample_rate = ap.load_audio(audio_file_path)
 
-        print(segments)
+    segment_samples = sample_rate * 60
+    segments = [samples[i:i + segment_samples] for i in range(0, len(samples), segment_samples)]
 
-    except Exception as e:
-        print(f"Error loading audio file: {e}")
+    # Apply A-weighting - The A-weighting filter simulates how human ears perceive loudness
+    # it gives less weight to very low and very high frequencies, and more to midrange frequencies.
+    sos = ap.apply_a_weighting_filter(sample_rate)
+    for i, segment in enumerate(segments):
+        filtered = sosfilt(sos, segment)
+        print(f"Filtered segment {i+1}, length: {len(filtered)} samples")
+
 
 if __name__ == "__main__":
     main()
