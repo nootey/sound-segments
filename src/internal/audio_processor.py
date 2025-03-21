@@ -248,6 +248,26 @@ class AudioProcessor:
         linear_energy = np.sum(10 ** (0.1 * np.array(db_values)))
         return 10 * np.log10(linear_energy / len(db_values))
 
+    def calculate_laf(self, squared, sample_rate):
+        """
+        Calculate LAF (A-weighted, Fast response) values for a given audio segment.
+        """
+
+        smoothed = self.apply_exponential_moving_average(squared, sample_rate, tau=0.125)
+
+        rms_pressure = np.sqrt(smoothed)
+
+        laf_db = self.pressure_to_db(rms_pressure)
+
+        samples_per_second = sample_rate
+        laf_db_per_second = [
+            round(np.max(laf_db[i:i + samples_per_second]), 1)
+            for i in range(0, len(laf_db), samples_per_second)
+            if i + samples_per_second <= len(laf_db)
+        ]
+
+        return laf_db_per_second, laf_db
+
     def process_segment(self, segment, sample_rate, timestamp, index):
         """
         Processes a 60-second audio segment:
@@ -279,7 +299,7 @@ class AudioProcessor:
         overall_la_eq = self.compute_LAeq(smoothed)
 
         # Step 4: Per-second LAeq (true RMS)
-        print("     Calculating sound level")
+        print("     Calculating LAeq values")
         samples_per_second = sample_rate
         per_second_la_eqs = []
 
@@ -296,6 +316,9 @@ class AudioProcessor:
         # Alternative LAeq calculation (mimics SLM 1s calculation)
         la_eq_alt = self.compute_laeq_from_db_values(per_second_la_eqs)
 
+        print("     Calculating LAF values")
+        laf_1s, laf_full = self.calculate_laf(squared, sample_rate)
+
         # Build output dict
         return {
             "Index": index,
@@ -303,5 +326,7 @@ class AudioProcessor:
             "Duration [s]": round(duration_sec, 2),
             "LAeq avg [dBA]": round(overall_la_eq, 1),
             "LAeq avg alt [dBA]": round(la_eq_alt, 1),
-            "LAeq [dBA] [s]": ", ".join(str(val) for val in per_second_la_eqs)
+            "LAF avg [dBA]": round(np.mean(laf_full), 1),
+            "LAeq [dBA] [s]": ", ".join(str(val) for val in per_second_la_eqs),
+            "LAF [dBA] [s]": ", ".join(str(val) for val in laf_1s)
         }
