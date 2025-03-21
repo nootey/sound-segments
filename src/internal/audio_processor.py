@@ -199,3 +199,24 @@ class AudioProcessor:
             return spl
         except Exception as e:
             raise e
+    def compute_LAeq(self, squared_smoothed_signal, ref_pressure=20e-6):
+        """
+        Compute LAeq in dB.
+
+        Parameters:
+            squared_smoothed_signal (np.ndarray): Smoothed, squared A-weighted signal (represents power).
+            ref_pressure (float): Reference pressure in Pascals. Default is 20 µPa.
+
+        Returns:
+            float: LAeq in decibels.
+        """
+        # Compute mean power over time
+        mean_power = np.mean(squared_smoothed_signal)
+
+        # Avoid log(0) by setting a floor
+        mean_power = max(mean_power, 1e-20)
+
+        # Convert to LAeq using: LAeq = 10 * log10(mean_power / p0^2)
+        LAeq = 10 * np.log10(mean_power / (ref_pressure ** 2))
+
+        return LAeq
