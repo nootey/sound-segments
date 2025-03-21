@@ -139,3 +139,32 @@ class AudioProcessor:
         except Exception as e:
             raise e
 
+    def apply_exponential_moving_average(self, power_signal, sample_rate, tau=1.0):
+        """
+        Apply a low-pass filter (exponential moving average) to simulate a real sound level meter response.
+
+        Parameters:
+            power_signal (np.ndarray): Squared, A-weighted audio samples.
+            sample_rate (int): Sample rate of the audio.
+            tau (float): Time constant (in seconds). For LAeq, often 1s.
+
+        Returns:
+            np.ndarray: Smoothed (filtered) power signal.
+        """
+        try:
+            # Calculate the smoothing factor alpha based on the time constant tau
+            alpha = 1.0 / (tau * sample_rate + 1.0)
+
+            # Preallocate the output array
+            smoothed = np.zeros_like(power_signal)
+
+            # Initialize the first value (assume zero start)
+            smoothed[0] = power_signal[0]
+
+            # Apply the recursive filter: y[n] = alpha * x[n] + (1 - alpha) * y[n-1]
+            for i in range(1, len(power_signal)):
+                smoothed[i] = alpha * power_signal[i] + (1 - alpha) * smoothed[i - 1]
+
+            return smoothed
+        except Exception as e:
+            raise e
