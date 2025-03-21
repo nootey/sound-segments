@@ -24,22 +24,44 @@ class AudioProcessor:
         except Exception as e:
             raise e
 
+    def get_file_with_extension(self, file_path: str) -> str:
+        """
+        Checks if the file has an extension. If not, looks for the file with an extension in the filesystem.
+        """
+        # Check if the file already has an extension
+        if '.' in file_path:
+            return file_path
+
+        # If no extension is provided, attempt to find the file with an extension
+        for ext in ['.mp3', '.wav']:
+            possible_path = file_path + ext
+            if os.path.isfile(possible_path):
+                return possible_path
+
+        raise FileNotFoundError(f"File '{file_path}' not found with either .mp3 or .wav extension.")
+
     def ensure_wav_format(self, file_path: str) -> str:
         """
         Ensures the audio file is in .wav format.
         """
-        _, ext = os.path.splitext(file_path)
+        # Check if the file exists and find the file with the extension
+        file_with_ext = self.get_file_with_extension(file_path)
+
+        # Get the extension and handle logic
+        _, ext = os.path.splitext(file_with_ext)
         ext = ext.lower()
+
+        print(ext)
 
         if ext not in ['.mp3', '.wav']:
             raise ValueError(f"Unsupported file format: {ext}. Only MP3 and WAV are supported.")
 
         if ext == '.wav':
-            return file_path
+            return file_with_ext
 
         # If it's an MP3, convert to WAV
-        audio = AudioSegment.from_mp3(file_path)
-        wav_path = file_path.replace('.mp3', '.wav')
+        audio = AudioSegment.from_mp3(file_with_ext)
+        wav_path = file_with_ext.replace('.mp3', '.wav')
 
         print(f"Converting MP3 to WAV: {wav_path}")
         audio.export(wav_path, format="wav")

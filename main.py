@@ -8,10 +8,13 @@ def main():
     ap = AudioProcessor()
 
     recording_name = "sample"
-    audio_file_path = f"data/{recording_name}.mp3"
+    audio_file_path = f"data/{recording_name}"
+
+    # Ensure WAV format
+    wav_path = ap.ensure_wav_format(audio_file_path)
 
     # Load the audio file
-    samples, sample_rate = ap.load_audio(audio_file_path)
+    samples, sample_rate = ap.load_audio(wav_path)
 
     segment_samples = sample_rate * 60
     segments = [samples[i:i + segment_samples] for i in range(0, len(samples), segment_samples)]
