@@ -234,6 +234,9 @@ class AudioProcessor:
 
         # Duration of this segment (in seconds)
         duration_sec = len(segment) / sample_rate
+        if duration_sec < 1.0:
+            print(f"     Skipping segment {index} — too short to process")
+            return None
 
         # Step 1: Filter + Square
         print("     Squaring the samples")

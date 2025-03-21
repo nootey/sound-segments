@@ -40,14 +40,14 @@ def main():
         print(f"Calculating LAeq")
         segment_data = ap.process_segment(segment, sample_rate, sos, segment_time, i)
 
-        print(f"Calculating percentiles")
-        with_percentile_data = perc.calculate_percentiles(segment_data)
+        if segment_data:
+            print(f"Calculating percentiles")
+            with_percentile_data = perc.calculate_percentiles(segment_data)
 
-        segment_data.update(with_percentile_data)
-        output_data.append(segment_data)
+            segment_data.update(with_percentile_data)
+            output_data.append(segment_data)
 
     json_result = {"data": output_data}
-
 
     with open(output_path, "w") as f:
         json.dump(json_result, f, indent=2)
