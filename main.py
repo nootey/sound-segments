@@ -1,10 +1,6 @@
 import json
 from datetime import datetime, timedelta
 
-import numpy as np
-from pydub import AudioSegment
-from scipy.signal import sosfilt
-
 from src.internal.audio_percentiles import AudioPercentiles
 from src.internal.audio_processor import AudioProcessor
 
@@ -27,9 +23,6 @@ def main():
     segment_samples = sample_rate * 60
     segments = [samples[i:i + segment_samples] for i in range(0, len(samples), segment_samples)]
 
-    print("Applying A-weighting filter")
-    sos = ap.apply_a_weighting_filter(sample_rate)
-
     output_data = []
     base_timestamp = datetime.now().replace(second=0, microsecond=0)
 
@@ -38,7 +31,7 @@ def main():
         segment_time = base_timestamp + timedelta(seconds=i * 60)
 
         print(f"Calculating LAeq")
-        segment_data = ap.process_segment(segment, sample_rate, sos, segment_time, i)
+        segment_data = ap.process_segment(segment, sample_rate, segment_time, i)
 
         if segment_data:
             print(f"Calculating percentiles")

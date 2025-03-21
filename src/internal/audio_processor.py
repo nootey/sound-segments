@@ -1,9 +1,8 @@
 import os
-
 import numpy as np
 from pydub import AudioSegment
 from numpy import log10, pi
-from scipy.signal import bilinear_zpk, freqs, sosfilt, zpk2sos, zpk2tf
+from scipy.signal import bilinear_zpk, freqs, sosfilt, zpk2sos, zpk2tf, butter
 
 class AudioProcessor:
     def __init__(self):
@@ -132,6 +131,10 @@ class AudioProcessor:
         else:
             raise ValueError(f"'{output}' is not a valid output form.")
 
+    def highpass_filter(self, signal, sample_rate, cutoff=20, order=4):
+        sos = butter(order, cutoff / (0.5 * sample_rate), btype='highpass', output='sos')
+        return sosfilt(sos, signal)
+
     def apply_a_weighting_filter(self, fs):
         """
         Return the given signal after passing through a digital A-weighting filter
@@ -237,7 +240,7 @@ class AudioProcessor:
         except Exception as e:
             raise e
 
-    def process_segment(self, segment, sample_rate, sos, timestamp, index):
+    def process_segment(self, segment, sample_rate, timestamp, index):
         """
         Processes a 60-second audio segment:
         - Applies A-weighting
@@ -252,17 +255,22 @@ class AudioProcessor:
             print(f"     Skipping segment {index} — too short to process")
             return None
 
-        # Step 1: Filter + Square
-        print("     Squaring the samples")
-        full_filtered = sosfilt(sos, segment)
-        squared = full_filtered ** 2
+        # Step 1: Pre-filter (high-pass)
+        print("     Applying high-pass filter")
+        segment = self.highpass_filter(segment, sample_rate)
 
-        # Step 2: Smooth
-        print("     Applying low-pass filter")
+        # Step 2: Apply A-weighting
+        print("     Applying A-weighting filter")
+        sos = self.apply_a_weighting_filter(sample_rate)
+        full_filtered = sosfilt(sos, segment)
+
+        # Step 3: Square + smooth for LAeq
+        print("     Squaring and smoothing")
+        squared = full_filtered ** 2
         smoothed = self.apply_exponential_moving_average(squared, sample_rate)
         overall_la_eq = self.compute_LAeq(smoothed)
 
-        # Step 3: Calculate per-second LAeqs
+        # Step 4: Per-second LAeq (true RMS)
         print("     Calculating sound level")
         samples_per_second = sample_rate
         per_second_la_eqs = []
