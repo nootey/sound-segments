@@ -1,3 +1,6 @@
+import json
+from datetime import datetime, timedelta
+
 import numpy as np
 from pydub import AudioSegment
 from scipy.signal import sosfilt
@@ -10,6 +13,7 @@ def main():
 
     recording_name = "sample"
     audio_file_path = f"data/{recording_name}"
+    output_path = f"data/metadata_{recording_name}.json"
 
     # Ensure WAV format
     wav_path = ap.ensure_wav_format(audio_file_path)
@@ -20,27 +24,26 @@ def main():
     segment_samples = sample_rate * 60
     segments = [samples[i:i + segment_samples] for i in range(0, len(samples), segment_samples)]
 
-    # Apply A-weighting - The A-weighting filter simulates how human ears perceive loudness
-    # it gives less weight to very low and very high frequencies, and more to midrange frequencies.
+    print("Applying A-weighting filter")
     sos = ap.apply_a_weighting_filter(sample_rate)
 
-    # Process segments
+    output_data = []
+    base_timestamp = datetime.now().replace(second=0, microsecond=0)
+
     for i, segment in enumerate(segments):
-        filtered = sosfilt(sos, segment)
-        squared = filtered ** 2
+        print(f"Processing segment: {i+1}")
+        segment_time = base_timestamp + timedelta(seconds=i * 60)
+        segment_data = ap.process_segment(segment, sample_rate, sos, segment_time, i)
+        output_data.append(segment_data)
 
-        print(f"Filtered segment {i + 1}, length: {len(filtered)} samples \n")
-        print(f"First 10 squared samples (segment {i + 1}): {squared[:10]}")
+    json_result = {"data": output_data}
 
-        smoothed = ap.apply_exponential_moving_average(squared, sample_rate)
-        print(f"First 10 smoothed samples (segment {i + 1}): {smoothed[:10]}")
 
-        # Apply RMS
-        rms_pressure = ap.apply_root_mean_square(smoothed)
-        print(f"First 10 root mean square pressure (segment {i + 1}){rms_pressure[:10]}")
+    with open(output_path, "w") as f:
+        json.dump(json_result, f, indent=2)
 
-        spl = ap.pressure_to_db(rms_pressure)
-        print(f"First 10 SPLs (segment {i + 1}){spl[:10]} \n")
+    print(f"\nLAeq JSON written to: {output_path}")
+
 
 if __name__ == "__main__":
     main()

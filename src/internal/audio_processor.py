@@ -199,6 +199,7 @@ class AudioProcessor:
             return spl
         except Exception as e:
             raise e
+
     def compute_LAeq(self, squared_smoothed_signal, ref_pressure=20e-6):
         """
         Compute LAeq in dB.
@@ -220,3 +221,50 @@ class AudioProcessor:
         LAeq = 10 * np.log10(mean_power / (ref_pressure ** 2))
 
         return LAeq
+
+    def process_segment(self, segment, sample_rate, sos, timestamp, index):
+        """
+        Processes a 60-second audio segment:
+        - Applies A-weighting
+        - Computes full-segment LAeq
+        - Computes 1-second LAeq values
+        - Formats everything as a dictionary
+        """
+
+        # Duration of this segment (in seconds)
+        duration_sec = len(segment) / sample_rate
+
+        # Step 1: Filter + Square
+        print("     Squaring the samples")
+        filtered = sosfilt(sos, segment)
+        squared = filtered ** 2
+
+        # Step 2: Smooth
+        print("     Applying low-pass filter")
+        smoothed = self.apply_exponential_moving_average(squared, sample_rate)
+        overall_la_eq = self.compute_LAeq(smoothed)
+
+        # Step 3: Calculate per-second LAeqs
+        print("     Calculating LAeq")
+        samples_per_second = sample_rate
+        per_second_la_eqs = []
+
+        for sec in range(60):
+            start = sec * samples_per_second
+            end = start + samples_per_second
+            if end > len(segment):
+                break
+
+            sec_filtered = sosfilt(sos, segment[start:end])
+            sec_squared = sec_filtered ** 2
+            laeq_1s = self.compute_LAeq(sec_squared)
+            per_second_la_eqs.append(round(laeq_1s, 1))
+
+        # Build output dict
+        return {
+            "Index": index,
+            "Timestamp": timestamp.strftime("%Y-%m-%d %H:%M"),
+            "Duration [s]": round(duration_sec, 2),
+            "LAeq avg [dBA]": round(overall_la_eq, 1),
+            "LAeq [dBA] [s]": ", ".join(str(val) for val in per_second_la_eqs)
+        }
