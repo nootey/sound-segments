@@ -8,12 +8,13 @@ from scipy.signal import bilinear_zpk, freqs, sosfilt, zpk2sos, zpk2tf
 class AudioProcessor:
     def __init__(self):
         print("AudioProcessor initialized")
+        self._sos_cache = {}
 
     def load_audio(self, file_path):
         """ Load MP3 file and convert to normalized numpy array """
         try:
             audio = AudioSegment.from_mp3(file_path).set_channels(1)  # Convert to mono
-            samples = np.array(audio.get_array_of_samples(), dtype=np.float32)
+            samples = np.array(audio.get_array_of_samples(), dtype=np.float64)
             sample_rate = audio.frame_rate
 
             # Normalize samples to range -1 to 1
@@ -136,7 +137,9 @@ class AudioProcessor:
         Return the given signal after passing through a digital A-weighting filter
         """
         try:
-            return  self.A_weighting(fs, output='sos')
+            if fs not in self._sos_cache:
+                self._sos_cache[fs] = self.A_weighting(fs, output='sos')
+            return self._sos_cache[fs]
         except Exception as e:
             raise e
 
@@ -223,6 +226,17 @@ class AudioProcessor:
 
         return LAeq
 
+    def compute_true_rms_laeq(self, signal, ref_pressure=20e-6):
+        """
+        Computes LAeq using true RMS (no smoothing), intended for fixed-length windows (1s blocks) .
+        """
+        try:
+            power = np.mean(signal ** 2)
+            power = max(power, 1e-20)
+            return 10 * np.log10(power / (ref_pressure ** 2))
+        except Exception as e:
+            raise e
+
     def process_segment(self, segment, sample_rate, sos, timestamp, index):
         """
         Processes a 60-second audio segment:
@@ -240,8 +254,8 @@ class AudioProcessor:
 
         # Step 1: Filter + Square
         print("     Squaring the samples")
-        filtered = sosfilt(sos, segment)
-        squared = filtered ** 2
+        full_filtered = sosfilt(sos, segment)
+        squared = full_filtered ** 2
 
         # Step 2: Smooth
         print("     Applying low-pass filter")
@@ -259,9 +273,8 @@ class AudioProcessor:
             if end > len(segment):
                 break
 
-            sec_filtered = sosfilt(sos, segment[start:end])
-            sec_squared = sec_filtered ** 2
-            laeq_1s = self.compute_LAeq(sec_squared)
+            block = full_filtered[start:end]
+            laeq_1s = self.compute_true_rms_laeq(block)
             per_second_la_eqs.append(round(laeq_1s, 1))
 
         # Build output dict
