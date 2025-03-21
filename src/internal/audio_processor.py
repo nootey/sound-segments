@@ -240,6 +240,14 @@ class AudioProcessor:
         except Exception as e:
             raise e
 
+    def compute_laeq_from_db_values(self, db_values):
+        """
+        Alternative LAeq calculation from list of dB values,
+        using 10 * log10(sum(10^(0.1 * dB)) / N)
+        """
+        linear_energy = np.sum(10 ** (0.1 * np.array(db_values)))
+        return 10 * np.log10(linear_energy / len(db_values))
+
     def process_segment(self, segment, sample_rate, timestamp, index):
         """
         Processes a 60-second audio segment:
@@ -285,11 +293,15 @@ class AudioProcessor:
             laeq_1s = self.compute_true_rms_laeq(block)
             per_second_la_eqs.append(round(laeq_1s, 1))
 
+        # Alternative LAeq calculation (mimics SLM 1s calculation)
+        la_eq_alt = self.compute_laeq_from_db_values(per_second_la_eqs)
+
         # Build output dict
         return {
             "Index": index,
             "Timestamp": timestamp.strftime("%Y-%m-%d %H:%M"),
             "Duration [s]": round(duration_sec, 2),
             "LAeq avg [dBA]": round(overall_la_eq, 1),
+            "LAeq avg alt [dBA]": round(la_eq_alt, 1),
             "LAeq [dBA] [s]": ", ".join(str(val) for val in per_second_la_eqs)
         }
