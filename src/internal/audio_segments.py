@@ -1,3 +1,4 @@
+import os
 import re
 
 import numpy as np
@@ -66,3 +67,71 @@ class AudioSegments:
               f"(σ={std_dev:.2f}, Peak-BG={peak_to_background:.2f})")
 
         return round(initial_threshold_offset, 2)
+
+    def detect_events(self, sound_levels, baseline_levels, dynamic_threshold, sustained_offset=5):
+        events = []
+        in_event = False
+        event_start = None
+
+        frame_duration = 1  # 1 second per LAeq point
+        frame_rate = 1 / frame_duration
+        grace_period_sec = 0.5
+        grace_frames = int(grace_period_sec * frame_rate)
+        grace_counter = 0
+
+        for i in range(len(sound_levels)):
+            current_baseline = float(baseline_levels[i]) + 1.0
+            initial_threshold = current_baseline + dynamic_threshold
+            sustained_threshold = current_baseline + sustained_offset
+            lvl = sound_levels[i]
+
+            if not in_event:
+                if lvl > initial_threshold:
+                    in_event = True
+                    event_start = i
+                    grace_counter = 0
+            else:
+                if lvl < sustained_threshold:
+                    grace_counter += 1
+                    if grace_counter >= grace_frames and event_start is not None:
+                        events.append((event_start, i - grace_counter))
+                        in_event = False
+                        event_start = None
+                else:
+                    grace_counter = 0
+
+        if in_event:
+            events.append((event_start, len(sound_levels) - 1))
+
+        return events
+
+    def extract_segments(self, audio_segment, events, segment_output_path, index):
+        segments = []
+        segment_counter = 1
+
+        for (start_idx, end_idx) in events:
+            start_time_sec = max(0, start_idx - 1)
+            end_time_sec = min(len(audio_segment) / 1000.0, end_idx + 1)
+            duration_sec = end_time_sec - start_time_sec
+
+            if duration_sec < 1:
+                print(f"Skipping short segment ({duration_sec:.2f}s)")
+                continue
+
+            print(f"Segment {segment_counter}: Start={start_time_sec}s, "
+                  f"End={end_time_sec}s, Duration={duration_sec}s")
+
+            segments.append((start_time_sec, end_time_sec))
+
+            start_ms = int(start_time_sec * 1000)
+            end_ms = int(end_time_sec * 1000)
+            extracted = audio_segment[start_ms:end_ms]
+
+            segment_filename = os.path.join(segment_output_path, f"segment_{index}_{segment_counter}.wav")
+            os.makedirs(segment_output_path, exist_ok=True)
+            extracted.export(segment_filename, format="wav")
+            print(f"Saved segment to: {segment_filename}")
+
+            segment_counter += 1
+
+        return segments

@@ -76,7 +76,6 @@ def generate_metadata(audio_file_path, metadata_output_path, samples=None, sampl
     print(f"\nMetadata saved to: {metadata_output_path}")
 
 def generate_segments(metadata_path, segment_path, recording_name, audio_clip, sr):
-
     a = AudioSegments()
     ap = AudioPlotter()
     data_by_index = a.generate_dataframe(metadata_path)
@@ -89,111 +88,36 @@ def generate_segments(metadata_path, segment_path, recording_name, audio_clip, s
     )
 
     for index, df in data_by_index.items():
+        if "LAeq" not in df.columns or "LA90" not in df.columns:
+            continue
 
         dynamic_threshold = a.calculate_dynamic_threshold(df)
-        sustained_threshold_offset = 5
-        sound_columns = ["LAeq"]
-        la_params = ["LA90"]
+        events = a.detect_events(
+            sound_levels=df["LAeq"].values,
+            baseline_levels=df["LA90"].astype(float).values,
+            dynamic_threshold=dynamic_threshold,
+        )
 
-        for sound_column in sound_columns:
-            if sound_column not in df.columns:
-                print(f"Skipping {sound_column} — not found in data.")
-                continue
+        if not events:
+            print("No significant sound events detected.")
+            continue
 
-            for la_param in la_params:
-                if la_param not in df.columns:
-                    print(f"Skipping {la_param} (not in metadata).")
-                    continue
+        segments = a.extract_segments(audio_segment, events, segment_path, index)
 
-                la_baseline_values = df[la_param].astype(float).values
-                sound_levels = df[sound_column].values
+        # Normalize for plotting
+        plot_audio = audio_clip.astype(np.float32)
+        plot_audio /= np.max(np.abs(plot_audio))
 
-                print(f"Testing {sound_column} with offset {dynamic_threshold} vs {la_param} baseline")
+        plot_path = f"results/plots/{recording_name}/LAeq/"
+        os.makedirs(plot_path, exist_ok=True)
 
-                events = []
-                in_event = False
-                event_start = None
-
-                frame_duration = 1  # 1 second per LAeq point
-                frame_rate = 1 / frame_duration
-                grace_period_sec = 0.5
-                grace_frames = int(grace_period_sec * frame_rate)
-                grace_counter = 0
-
-                for i in range(len(sound_levels)):
-                    current_baseline = float(la_baseline_values[i]) + 1.0  # +1dB "safety buffer"
-                    initial_threshold = current_baseline + dynamic_threshold
-                    sustained_threshold = current_baseline + sustained_threshold_offset
-                    lvl = sound_levels[i]
-
-                    if not in_event:
-                        if lvl > initial_threshold:
-                            in_event = True
-                            event_start = i
-                            grace_counter = 0
-                    else:
-                        if lvl < sustained_threshold:
-                            grace_counter += 1
-                            if grace_counter >= grace_frames and event_start is not None:
-                                events.append((event_start, i - grace_counter))
-                                in_event = False
-                                event_start = None
-                        else:
-                            grace_counter = 0
-
-                if in_event:
-                    events.append((event_start, len(sound_levels) - 1))
-
-                if not events:
-                    print("No significant sound events detected.")
-
-                segments = []
-                segment_counter = 1
-
-                for (start_idx, end_idx) in events:
-                    start_time_sec = max(0, start_idx - 1)
-                    end_time_sec = min(len(sound_levels), end_idx + 1)
-                    duration_sec = end_time_sec - start_time_sec
-
-                    if duration_sec < 1:
-                        print(f"Skipping short segment ({duration_sec:.2f}s)")
-                        continue
-
-                    print(f"Segment {segment_counter}: Start={start_time_sec}s, "
-                          f"End={end_time_sec}s, Duration={duration_sec}s")
-
-                    segments.append((start_time_sec, end_time_sec))
-
-                    # Export audio segment
-                    start_ms = int(start_time_sec * 1000)
-                    end_ms = int(end_time_sec * 1000)
-                    extracted = audio_segment[start_ms:end_ms]
-
-                    segment_filename = os.path.join(segment_path, f"segment_{index}_{segment_counter}.wav")
-                    os.makedirs(segment_path, exist_ok=True)
-                    extracted.export(segment_filename, format="wav")
-                    print(f"Saved segment to: {segment_filename}")
-
-                    segment_counter += 1
-
-                # Save plot
-                plot_path = f"results/plots/{recording_name}/{sound_column}/"
-                os.makedirs(plot_path, exist_ok=True)
-
-                plot_audio = audio_clip.astype(np.float32)
-                plot_audio /= np.max(np.abs(plot_audio))
-
-                print("Generating waveform plot")
-
-                ap.plot_waveform_with_segments(
-                    y=plot_audio,
-                    sr=sr,
-                    segments=segments,
-                    title=f"Waveform: Baseline {la_param} with offset {dynamic_threshold} dB",
-                    save_path=os.path.join(plot_path, f"{la_param}_{dynamic_threshold}db.png"),
-                )
-
-
+        ap.plot_waveform_with_segments(
+            y=plot_audio,
+            sr=sr,
+            segments=segments,
+            title=f"Waveform: Baseline LA90 with offset {dynamic_threshold} dB",
+            save_path=os.path.join(plot_path, f"LA90_{dynamic_threshold}db.png"),
+        )
 
 def main():
     print("Sound segments")
@@ -227,7 +151,6 @@ def main():
     )
 
     print("Done")
-
 
 
 if __name__ == "__main__":
