@@ -34,7 +34,9 @@ def generate_metadata(audio_file_path, metadata_output_path, samples=None, sampl
 
     if os.path.exists(metadata_output_path):
         print("Metadata already exists, skipping generation.")
-        return
+        with open(metadata_output_path, "r") as f:
+            existing_data = json.load(f)
+        return existing_data["data"]
 
     print("Generating metadata ...")
 
@@ -65,9 +67,6 @@ def generate_metadata(audio_file_path, metadata_output_path, samples=None, sampl
             segment_data.update(with_percentile_data)
             output_data.append(segment_data)
 
-            # print(f"Plotting")
-            # plot_options(plotter, plot_output_path, ap, segment_data, segment, i, sample_rate)
-
     json_result = {"data": output_data}
 
     with open(metadata_output_path, "w") as f:
@@ -75,9 +74,14 @@ def generate_metadata(audio_file_path, metadata_output_path, samples=None, sampl
 
     print(f"\nMetadata saved to: {metadata_output_path}")
 
-def generate_segments(metadata_path, segment_path, recording_name, audio_clip, sr):
+    return output_data
+
+def generate_segments(metadata_path, segment_path, recording_name, audio_clip, sr, ap = None):
+
+    if ap is None:
+        ap = AudioPlotter()
+
     a = AudioSegments()
-    ap = AudioPlotter()
     data_by_index = a.generate_dataframe(metadata_path)
 
     audio_segment = AudioSegment(
@@ -139,10 +143,19 @@ def main():
     audio_segment = AudioSegment.from_file(wav_path).set_channels(1)
     raw_samples = np.array(audio_segment.get_array_of_samples(), dtype=np.int16)
 
-    generate_metadata(audio_file_path, metadata_path, samples=norm_samples, sample_rate=sr)
+    metadata = generate_metadata(audio_file_path, metadata_path, samples=norm_samples, sample_rate=sr)
+
+    print(f"Plotting informational graphs ...")
+    plotter = AudioPlotter()
+
+    segment_duration_samples = sr * 60
+    for index, data in enumerate(metadata):
+        segment_signal = norm_samples[index * segment_duration_samples : (index + 1) * segment_duration_samples]
+        plot_options(plotter, plot_output_path, ap, data, segment_signal, index, sr)
 
     print("\nSegmenting audio ...")
     generate_segments(
+        ap=plotter,
         metadata_path=metadata_path,
         segment_path=segment_output_path,
         recording_name=recording_name,
