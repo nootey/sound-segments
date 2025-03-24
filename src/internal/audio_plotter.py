@@ -1,5 +1,6 @@
 import os
 
+import librosa
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -52,3 +53,20 @@ class AudioPlotter:
             plt.text(bar.get_x() + bar.get_width()/2.0, yval + 0.5, f'{yval:.1f}', ha='center', va='bottom')
         plt.tight_layout()
         plt.savefig(os.path.join(output_path, f"segment_{index + 1}_summary.png"))
+
+    def plot_waveform_with_segments(self, y, sr, segments, title="Waveform with Segmentation Boundaries", save_path=None):
+        """
+        Plot the audio waveform with overlaid segmentation boundaries.
+        """
+        plt.figure(figsize=(14, 4))
+        librosa.display.waveshow(y, sr=sr)
+        for start_time, end_time in segments:
+            plt.axvspan(start_time, end_time, color="red", alpha=0.3)
+        plt.title(title)
+        plt.xlabel("Time (s)")
+
+        if save_path:
+            plt.savefig(save_path)
+            plt.close()
+        else:
+            plt.show()
