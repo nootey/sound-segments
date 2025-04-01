@@ -54,3 +54,4 @@ python main.py
 - The app lacks support for batch processing, quality of life features such as better audio selection etc ...
 - The calculation is done in python, it does not reflect the accuracy of a proper sound meter,
 - The segmentation is not fine-tuned. Baseline padding could perhaps be calculated dynamically, or at least tweaked. Same with padding for before and after an event.
+- Shorter segments that are grouped closely together do not get detected reliably.
