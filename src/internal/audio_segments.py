@@ -109,6 +109,13 @@ class AudioSegments:
         segments = []
         segment_counter = 1
 
+        if os.path.exists(segment_output_path):
+            for filename in os.listdir(segment_output_path):
+                file_path = os.path.join(segment_output_path, filename)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            print(f"Cleared existing files in: {segment_output_path}")
+
         for (start_idx, end_idx) in events:
             start_time_sec = max(0, start_idx - 1)
             end_time_sec = min(len(audio_segment) / 1000.0, end_idx + 1)
@@ -128,7 +135,6 @@ class AudioSegments:
             extracted = audio_segment[start_ms:end_ms]
 
             segment_filename = os.path.join(segment_output_path, f"segment_{index}_{segment_counter}.wav")
-            os.makedirs(segment_output_path, exist_ok=True)
             extracted.export(segment_filename, format="wav")
             print(f"Saved segment to: {segment_filename}")
 
